@@ -34,7 +34,7 @@ class Config:
 
     BACKBONE    = "efficientnet_b2"
     IMG_SIZE    = 768
-    HEATMAP_SIGMA = 2.0
+    HEATMAP_SIGMA = 4.0
     NUM_CLASSES = 3
     PRETRAINED  = True
     DROP_RATE   = 0.3
@@ -46,9 +46,9 @@ class Config:
     WEIGHT_DECAY     = 1e-4
     GRAD_CLIP_NORM   = 1.0
 
-    KP_LOSS_WEIGHT  = 5.0
+    KP_LOSS_WEIGHT  = 100.0
     CLS_LOSS_WEIGHT = 1.0
-    COORD_LOSS_WEIGHT = 3.0
+    COORD_LOSS_WEIGHT = 0.0
 
     T_0    = 10
     T_MULT = 2
@@ -120,7 +120,7 @@ def get_train_transforms():
     return A.Compose([
         A.LongestMaxSize(max_size=cfg.IMG_SIZE),
         A.PadIfNeeded(min_height=cfg.IMG_SIZE, min_width=cfg.IMG_SIZE,
-                      border_mode=cv2.BORDER_CONSTANT, value=0),
+                      border_mode=cv2.BORDER_CONSTANT, fill=0),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
@@ -139,7 +139,7 @@ def get_val_transforms():
     return A.Compose([
         A.LongestMaxSize(max_size=cfg.IMG_SIZE),
         A.PadIfNeeded(min_height=cfg.IMG_SIZE, min_width=cfg.IMG_SIZE,
-                      border_mode=cv2.BORDER_CONSTANT, value=0),
+                      border_mode=cv2.BORDER_CONSTANT, fill=0),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
     ], keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
@@ -148,7 +148,7 @@ def get_test_transforms():
     return A.Compose([
         A.LongestMaxSize(max_size=cfg.IMG_SIZE),
         A.PadIfNeeded(min_height=cfg.IMG_SIZE, min_width=cfg.IMG_SIZE,
-                      border_mode=cv2.BORDER_CONSTANT, value=0),
+                      border_mode=cv2.BORDER_CONSTANT, fill=0),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
     ])
