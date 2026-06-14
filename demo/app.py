@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 # ══════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════
-IMG_SIZE = 768
+IMG_SIZE = 640
 SHAPE_CLASSES = ["Cross", "L-Shape", "Square"]
 NUM_CLASSES = 3
 BACKBONE = "efficientnet_b2"

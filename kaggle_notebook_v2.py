@@ -33,14 +33,14 @@ class Config:
     PREDICTIONS_PATH= "/kaggle/working/predictions.json"
 
     BACKBONE    = "efficientnet_b2"
-    IMG_SIZE    = 768
+    IMG_SIZE    = 640
     HEATMAP_SIGMA = 4.0
     NUM_CLASSES = 3
     PRETRAINED  = True
     DROP_RATE   = 0.3
 
-    BATCH_SIZE       = 8
-    GRAD_ACCUM_STEPS = 4
+    BATCH_SIZE       = 16
+    GRAD_ACCUM_STEPS = 2
     NUM_EPOCHS       = 50
     LR               = 3e-4
     WEIGHT_DECAY     = 1e-4
@@ -55,7 +55,7 @@ class Config:
     PATIENCE      = 10
     FREEZE_EPOCHS = 3
     VAL_SPLIT   = 0.2
-    NUM_WORKERS = 2
+    NUM_WORKERS = 4
     SEED        = 42
 
     # FIXED: match actual JSON values
