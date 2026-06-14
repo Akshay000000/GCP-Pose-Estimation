@@ -102,9 +102,11 @@ def spatial_soft_argmax(heatmap, temp=50.0):
 
 def compute_pck(pred, gt, orig_ws, orig_hs, thresholds=(10, 25, 50)):
     """PCK using actual per-image dimensions."""
-    scales = torch.stack([orig_ws, orig_hs], dim=1).float()
-    pred_px = pred * scales
-    gt_px = gt * scales
+    # Since we use LongestMaxSize+PadIfNeeded, the padded IMG_SIZE square
+    # corresponds to max(orig_w, orig_h) in the original image scale.
+    max_dims = torch.max(orig_ws, orig_hs).float().unsqueeze(1)
+    pred_px = pred * max_dims
+    gt_px = gt * max_dims
     dists = torch.norm(pred_px - gt_px, dim=1)
     res = {f"PCK@{t}": (dists <= t).float().mean().item() for t in thresholds}
     res["mean_dist_px"] = dists.mean().item()
