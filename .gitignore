@@ -1,0 +1,23 @@
+# Datasets / Archives
+Dataset/
+train_dataset/
+test_dataset/
+*.zip
+
+# Model Weights
+*.pth
+*.pt
+*.bin
+
+# Python/Environment
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+.ipynb_checkpoints/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store

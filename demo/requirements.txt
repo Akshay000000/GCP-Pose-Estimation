@@ -1,0 +1,7 @@
+torch
+torchvision
+timm
+gradio>=4.0
+opencv-python-headless
+numpy
+Pillow
