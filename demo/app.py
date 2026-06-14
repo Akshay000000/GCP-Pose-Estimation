@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 # ══════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════
-IMG_SIZE = 640
+IMG_SIZE = 768
 SHAPE_CLASSES = ["Cross", "L-Shape", "Square"]
 NUM_CLASSES = 3
 BACKBONE = "efficientnet_b2"
@@ -130,12 +130,22 @@ STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 def preprocess(image_np):
-    """Resize, normalize, convert to tensor."""
-    img = cv2.resize(image_np, (IMG_SIZE, IMG_SIZE))
-    img = img.astype(np.float32) / 255.0
-    img = (img - MEAN) / STD
-    img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
-    return torch.from_numpy(img).unsqueeze(0).to(DEVICE)
+    """Resize preserving aspect ratio, pad, normalize, convert to tensor."""
+    orig_h, orig_w = image_np.shape[:2]
+    scale = IMG_SIZE / max(orig_w, orig_h)
+    new_w = int(orig_w * scale)
+    new_h = int(orig_h * scale)
+    img = cv2.resize(image_np, (new_w, new_h))
+    # Pad to IMG_SIZE x IMG_SIZE
+    pad_x = (IMG_SIZE - new_w) // 2
+    pad_y = (IMG_SIZE - new_h) // 2
+    padded = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+    padded[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = img
+    # Normalize
+    padded = padded.astype(np.float32) / 255.0
+    padded = (padded - MEAN) / STD
+    padded = np.transpose(padded, (2, 0, 1))  # HWC -> CHW
+    return torch.from_numpy(padded).unsqueeze(0).to(DEVICE)
 
 
 def draw_prediction(image_np, x_px, y_px, shape, confidence):
@@ -223,8 +233,18 @@ def predict(image):
     probs = F.softmax(logits, dim=1).numpy()[0]
     cls_idx = int(logits.argmax(1)[0])
 
-    x_px = float(kp[0]) * orig_w
-    y_px = float(kp[1]) * orig_h
+    # Reverse aspect-ratio-preserving resize + padding
+    scale = IMG_SIZE / max(orig_w, orig_h)
+    scaled_w = orig_w * scale
+    scaled_h = orig_h * scale
+    pad_x = (IMG_SIZE - scaled_w) / 2.0
+    pad_y = (IMG_SIZE - scaled_h) / 2.0
+    # Model predicts in [0, 1] of padded IMG_SIZE space
+    kp_x_padded = float(kp[0]) * IMG_SIZE
+    kp_y_padded = float(kp[1]) * IMG_SIZE
+    # Remove padding and un-scale to original pixel coords
+    x_px = max(0, min((kp_x_padded - pad_x) / scale, orig_w))
+    y_px = max(0, min((kp_y_padded - pad_y) / scale, orig_h))
     shape = SHAPE_CLASSES[cls_idx]
     confidence = float(probs[cls_idx])
 

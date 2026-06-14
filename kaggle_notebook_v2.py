@@ -33,8 +33,8 @@ class Config:
     PREDICTIONS_PATH= "/kaggle/working/predictions.json"
 
     BACKBONE    = "efficientnet_b2"
-    IMG_SIZE    = 640
-    HEATMAP_SIGMA = 10.0
+    IMG_SIZE    = 768
+    HEATMAP_SIGMA = 2.0
     NUM_CLASSES = 3
     PRETRAINED  = True
     DROP_RATE   = 0.3
@@ -46,9 +46,9 @@ class Config:
     WEIGHT_DECAY     = 1e-4
     GRAD_CLIP_NORM   = 1.0
 
-    KP_LOSS_WEIGHT  = 15.0
+    KP_LOSS_WEIGHT  = 5.0
     CLS_LOSS_WEIGHT = 1.0
-    COORD_LOSS_WEIGHT = 8.0
+    COORD_LOSS_WEIGHT = 3.0
 
     T_0    = 10
     T_MULT = 2
@@ -78,14 +78,15 @@ print(f"Device: {device}")
 # UTILITIES
 # ══════════════════════════════════════════════════════════════════════
 # %%
-def create_heatmap(kp_x_norm, kp_y_norm, H, W, sigma=4.0):
-    """Gaussian heatmap target centered at normalized keypoint."""
+def create_heatmap(kp_x_norm, kp_y_norm, H, W, sigma=2.0):
+    """Gaussian heatmap target centered at normalized keypoint, normalized to [0, 1]."""
     y_grid = torch.arange(H).float()
     x_grid = torch.arange(W).float()
     yy, xx = torch.meshgrid(y_grid, x_grid, indexing='ij')
     cx = kp_x_norm * (W - 1)
     cy = kp_y_norm * (H - 1)
     hm = torch.exp(-((xx - cx)**2 + (yy - cy)**2) / (2 * sigma**2))
+    hm = hm / (hm.max() + 1e-8)  # normalize peak to 1.0
     return hm
 
 def spatial_soft_argmax(heatmap, temp=50.0):
@@ -115,7 +116,9 @@ def compute_pck(pred, gt, orig_ws, orig_hs, thresholds=(10, 25, 50)):
 # %%
 def get_train_transforms():
     return A.Compose([
-        A.Resize(cfg.IMG_SIZE, cfg.IMG_SIZE),
+        A.LongestMaxSize(max_size=cfg.IMG_SIZE),
+        A.PadIfNeeded(min_height=cfg.IMG_SIZE, min_width=cfg.IMG_SIZE,
+                      border_mode=cv2.BORDER_CONSTANT, value=0),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
@@ -132,14 +135,18 @@ def get_train_transforms():
 
 def get_val_transforms():
     return A.Compose([
-        A.Resize(cfg.IMG_SIZE, cfg.IMG_SIZE),
+        A.LongestMaxSize(max_size=cfg.IMG_SIZE),
+        A.PadIfNeeded(min_height=cfg.IMG_SIZE, min_width=cfg.IMG_SIZE,
+                      border_mode=cv2.BORDER_CONSTANT, value=0),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
     ], keypoint_params=A.KeypointParams(format="xy", remove_invisible=False))
 
 def get_test_transforms():
     return A.Compose([
-        A.Resize(cfg.IMG_SIZE, cfg.IMG_SIZE),
+        A.LongestMaxSize(max_size=cfg.IMG_SIZE),
+        A.PadIfNeeded(min_height=cfg.IMG_SIZE, min_width=cfg.IMG_SIZE,
+                      border_mode=cv2.BORDER_CONSTANT, value=0),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
     ])
@@ -484,8 +491,21 @@ with torch.no_grad():
         pcls = out["logits"].argmax(1).cpu()
         for i in range(len(paths)):
             ow, oh = float(ows[i]), float(ohs[i])
-            px = round(float(pkp[i, 0]) * ow, 2)
-            py = round(float(pkp[i, 1]) * oh, 2)
+            # Reverse aspect-ratio-preserving resize + padding
+            scale = cfg.IMG_SIZE / max(ow, oh)
+            scaled_w = ow * scale
+            scaled_h = oh * scale
+            pad_x = (cfg.IMG_SIZE - scaled_w) / 2.0
+            pad_y = (cfg.IMG_SIZE - scaled_h) / 2.0
+            # Model predicts in [0, 1] of padded IMG_SIZE space
+            kp_x_padded = float(pkp[i, 0]) * cfg.IMG_SIZE
+            kp_y_padded = float(pkp[i, 1]) * cfg.IMG_SIZE
+            # Remove padding and un-scale
+            px = round((kp_x_padded - pad_x) / scale, 2)
+            py = round((kp_y_padded - pad_y) / scale, 2)
+            # Clamp to image bounds
+            px = max(0, min(px, ow))
+            py = max(0, min(py, oh))
             shape = cfg.SHAPE_CLASSES[int(pcls[i])]
             rel = os.path.relpath(paths[i], cfg.TEST_DATA_DIR).replace("\\", "/")
             predictions[rel] = {"mark": {"x": px, "y": py}, "verified_shape": shape}

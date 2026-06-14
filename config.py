@@ -17,7 +17,7 @@ class Config:
 
     # ── Model ────────────────────────────────────────────────────────────
     BACKBONE: str = "efficientnet_b2"
-    IMG_SIZE: int = 512
+    IMG_SIZE: int = 768
     NUM_CLASSES: int = 3
     PRETRAINED: bool = True
     DROP_RATE: float = 0.3
